@@ -1,39 +1,40 @@
 from flask import Flask, request, redirect, url_for, render_template, flash, send_file, abort, Response, jsonify
-
+import os 
 
 
 ###############################CONFIG#######################################
-#Flask Config
-#http://flask.pocoo.org/
+BUILTINPORT = 5000
+TWISTEDPORT = 80
+TWISTEDLOGFILE = "/var/log/app.log"
 app = Flask(__name__)
 app.config['MAX_CONTENT_LENGTH'] = 100 * 1024 * 1024
-SERVERPORT = 5000
+# Session seed, for per-session data
+app.secret_key = os.urandom(24)
+
+
 
 ################################METHODS######################################
 ## Start up Stuff
 
-# This gets the port to run on
-def getPort(value):
-	return (SERVERPORT, value)[value > 0]
-
 # Start a twistd server
-def twisted(option, opt_str, value, parser):
-	print 'Twisted on port {port}...'.format(port=getPort(value))
+def twisted():
+	print 'Twisted on port {port}...'.format(port=TWISTEDPORT)
 	# Only import these if we need them
 	from twisted.internet import reactor
 	from twisted.web.server import Site
 	from twisted.web.wsgi import WSGIResource
-
+	from twisted.python import log as twisted_log
+	twisted_log.startLogging(file=open(TWISTEDLOGFILE, "w"))
 	resource = WSGIResource(reactor, reactor.getThreadPool(), app)
 	site = Site(resource)
 
-	reactor.listenTCP(getPort(value), site, interface="0.0.0.0")
+	reactor.listenTCP(TWISTEDPORT, site, interface="0.0.0.0")
 	reactor.run()
 
 # start a built in flask server
-def builtin(option, opt_str, value, parser):
-	print 'Built-in development server on port {port}...'.format(port=getPort(value))
-	app.run(host="0.0.0.0",port=getPort(value),debug=True)
+def builtin():
+	print 'Built-in development server on port {port}...'.format(port=BUILTINPORT)
+	app.run(host="0.0.0.0",port=BUILTINPORT,debug=True)
 
 ## END Start up Stuff
 
@@ -48,26 +49,29 @@ def status():
 
 @app.route("/", methods=['GET'])
 def index():
-	return render_template("index.html")
+	head = "Hello World!"
+	msg = "This is my flask template"
+	company = "company name"
+	return render_template("index.html",msg = msg, head = head, company = company)
 
 
 
 ################################ERROR VIEWS######################################
 @app.errorhandler(400) 
 def custom400(error):
-    response = jsonify({'FAIL': error.description})
-    return response
+	response = jsonify({'FAIL': error.description})
+	return response
 
 
 @app.errorhandler(403)
-def error403(e):
-	dmsg = ""
-	return '403'
+def error403(error):
+	response = jsonify({'FAIL': error.description})
+	return response
 
 @app.errorhandler(404)
-def error404(e):
-	dmsg = ""
-	return "404"
+def error404(error):
+	response = jsonify({'FAIL': error.description})
+	return response
 
 
 ################################MAIN - RUN SETUP######################################
@@ -80,4 +84,5 @@ def startup():
 	parser.print_help()
 
 if __name__ == "__main__":
-	startup() 
+	print("Starting")
+	builtin() 
